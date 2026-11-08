@@ -1,0 +1,12 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment: { POSTGRES_DB: studioflow, POSTGRES_USER: studioflow, POSTGRES_PASSWORD: studioflow }
+    ports: ["5432:5432"]
+    volumes: [studioflow_pgdata:/var/lib/postgresql/data]
+  api:
+    build: ./StudioFlow
+    environment: { ConnectionStrings__Default: "Host=postgres;Port=5432;Database=studioflow;Username=studioflow;Password=studioflow" }
+    ports: ["8080:8080"]
+    depends_on: [postgres]
+volumes: { studioflow_pgdata: {} }
