@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "rootDir": "ClientApp/src", "outDir": "wwwroot/js",
+    "noEmitOnError": true, "strictNullChecks": true, "useUnknownInCatchVariables": false
+  },
+  "include": ["ClientApp/src/**/*.ts"]
+}

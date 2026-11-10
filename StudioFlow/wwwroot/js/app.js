@@ -1,33 +1,164 @@
-
-    const state={token:sessionStorage.getItem('studioflow_token'),user:null};
-    try { state.user=JSON.parse(sessionStorage.getItem('studioflow_user')||'null'); } catch { sessionStorage.clear(); }
-    if (!state.user) state.token=null;
-    const $=id=>document.getElementById(id); const show=(el,yes)=>el.classList.toggle('hidden',!yes);
-    async function api(path,opts={}){opts.headers={...(opts.headers||{}), 'Content-Type':'application/json'}; if(state.token) opts.headers.Authorization='Bearer '+state.token; const r=await fetch(path,opts); const text=await r.text(); let data; try{data=JSON.parse(text)}catch{data=text} if(r.status===401 && !path.startsWith('/api/auth/')){clearSession();authMessage('Сессия истекла. Войдите снова.');throw new Error('Требуется вход');} if(!r.ok) throw new Error(typeof data==='string'?data:(data.title||data.detail||'Запрос не выполнен')); return data}
-    function message(text,error=false){$('message').textContent=text;$('message').classList.remove('hidden');$('message').classList.toggle('error',error)}
-    function authMessage(text){$('authMessage').textContent=text;$('authMessage').classList.remove('hidden')}
-    function setSession(data){state.token=data.token;state.user={id:data.id,email:data.email,role:data.role,tenantId:data.tenantId};sessionStorage.setItem('studioflow_token',data.token);sessionStorage.setItem('studioflow_user',JSON.stringify(state.user));render()}
-    async function render(){show($('authView'),!state.token);show($('appView'),!!state.token);if(!state.token)return;$('userBar').textContent=state.user.email+' · '+state.user.role;$('tenantInfo').textContent='Tenant: '+state.user.tenantId;show($('adminPanel'),['Admin','Manager'].includes(state.user.role));await Promise.all([loadRooms(),loadBookings()])}
-    async function loadRooms(){try{const rooms=await api('/api/rooms');$('rooms').innerHTML=rooms.length?rooms.map(r=>`<article class="room"><div><h2>${esc(r.name)}</h2><div class="meta">Вместимость: ${r.capacity} чел.</div></div><div class="actions"><span class="price">${r.tariff? r.tariff.hourlyRate+' ₽/час':'Тариф не задан'}</span><button onclick="book('${r.id}','${esc(r.name)}')">Забронировать</button></div></article>`).join(''):'<div class="notice">Комнат пока нет. Добавьте первую комнату в админ-панели.</div>'}catch(e){message(e.message,true)}}
-    async function loadBookings(){try{const bs=await api('/api/bookings');$('bookings').innerHTML=bs.length?bs.map(b=>`<div class="booking"><div><strong>${esc(b.room?.name||'Комната')}</strong><br><small>${new Date(b.startsAt).toLocaleString()} — ${new Date(b.endsAt).toLocaleString()} · ${b.status}</small></div>${b.status==='Active'?`<button class="danger" onclick="cancelBooking('${b.id}')">Отменить</button>`:''}</div>`).join(''):'<div class="notice">Бронирований пока нет.</div>'}catch(e){message(e.message,true)}}
-        async function cancelBooking(id){if(!confirm('Отменить бронирование?'))return;try{await api('/api/bookings/'+id+'/cancel',{method:'POST'});loadBookings()}catch(e){message(e.message,true)}}
-    function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-    $('loginForm').onsubmit=async e=>{e.preventDefault();try{setSession(await api('/api/auth/login',{method:'POST',body:JSON.stringify({email:$('loginEmail').value,password:$('loginPassword').value})}))}catch(e){authMessage(e.message)}};
-    $('registerForm').onsubmit=async e=>{e.preventDefault();try{setSession(await api('/api/auth/register',{method:'POST',body:JSON.stringify({email:$('registerEmail').value,password:$('registerPassword').value,tenantId:$('tenantId').value})}))}catch(e){authMessage(e.message)}};
-    $('roomForm').onsubmit=async e=>{e.preventDefault();try{await api('/api/rooms',{method:'POST',body:JSON.stringify({name:$('roomName').value,capacity:Number($('roomCapacity').value)})});e.target.reset();message('Комната добавлена.');loadRooms()}catch(e){message(e.message,true)}};
-    let selectedRoom;
-    async function book(id){selectedRoom=id;show($('slotsPanel'),true);$('slotDate').value=new Date().toISOString().slice(0,10);await refreshSlots();$('slotsPanel').scrollIntoView()};
-    async function refreshSlots(){try{const slots=await api('/api/rooms/'+selectedRoom+'/slots?date='+$('slotDate').value);$('slots').replaceChildren();for(const slot of slots){const b=document.createElement('button');b.textContent=slot.startsAt.slice(11,16)+(slot.available?'':' · занято');b.disabled=!slot.available;b.onclick=async()=>{try{await api('/api/bookings',{method:'POST',body:JSON.stringify({roomId:selectedRoom,startsAt:slot.startsAt,endsAt:slot.endsAt})});await refreshSlots();await loadBookings();message('Бронирование создано')}catch(e){message(e.message,true);await refreshSlots()}};$('slots').append(b)}}catch(e){message(e.message,true)}}
-    $('slotDate').onchange=refreshSlots;
-    $('tenantId').value='00000000-0000-0000-0000-000000000001';$('tenantId').type='hidden';$('tenantId').previousElementSibling.hidden=true;
-    const tools=document.createElement('div');tools.innerHTML='<hr><h2>Тарифы и комнаты</h2><button type="button" id="newTariff">Добавить тариф</button><div id="management"></div>';$('adminPanel').append(tools);
-    async function manage(){try{const [rooms,tariffs]=await Promise.all([api('/api/rooms'),api('/api/tariffs')]);const box=$('management');box.replaceChildren();for(const t of tariffs){const b=document.createElement('button');b.className='secondary';b.textContent=t.name+' · '+t.hourlyRate+' ₽ — изменить';b.onclick=async()=>{const name=prompt('Название',t.name),rate=prompt('Цена за час',t.hourlyRate);if(!name||!rate)return;try{await api('/api/tariffs/'+t.id,{method:'PUT',body:JSON.stringify({name,hourlyRate:Number(rate)})});await manage();await loadRooms()}catch(e){message(e.message,true)}};box.append(b)}for(const r of rooms){const b=document.createElement('button');b.textContent='Изменить '+r.name;b.onclick=async()=>{const name=prompt('Название',r.name);if(!name)return;const capacity=Number(prompt('Вместимость',r.capacity));const choices=tariffs.map((t,i)=>(i+1)+': '+t.name).join('\n');const choice=Number(prompt('Тариф (0 — без тарифа)\n'+choices,'1'));try{await api('/api/rooms/'+r.id,{method:'PUT',body:JSON.stringify({name,capacity,isActive:!confirm('Скрыть комнату? Нажмите Отмена, чтобы оставить активной.'),tariffId:tariffs[choice-1]?.id||null})});await manage();await loadRooms()}catch(e){message(e.message,true)}};box.append(b)}}catch(e){message(e.message,true)}}
-    $('newTariff').onclick=async()=>{const name=prompt('Название тарифа'),rate=prompt('Цена за час');if(!name||!rate)return;try{await api('/api/tariffs',{method:'POST',body:JSON.stringify({name,hourlyRate:Number(rate)})});await manage()}catch(e){message(e.message,true)}};
-    const originalRender=render;render=async()=>{await originalRender();if(state.token&&['Admin','Manager'].includes(state.user.role))await manage()};
-    $('logout').onclick=()=>{sessionStorage.removeItem('studioflow_token');sessionStorage.removeItem('studioflow_user');location.reload()}; render();
-  
-function clearSession(){state.token=null;state.user=null;sessionStorage.removeItem('studioflow_token');sessionStorage.removeItem('studioflow_user');$('userBar').textContent='';show($('slotsPanel'),false);show($('appView'),false);show($('authView'),true);}
-function authMode(register){show($('loginForm'),!register);show($('registerForm'),register);show($('authMessage'),false);}
-$('showRegister').onclick=()=>authMode(true);
-$('showLogin').onclick=()=>authMode(false);
-authMode(location.hash==='#register');
+const $ = (id) => document.getElementById(id);
+const state = { token: sessionStorage.getItem('studioflow_token'), user: null, rooms: [], tariffs: [], bookings: [], register: false, room: null, editor: null };
+try {
+    state.user = JSON.parse(sessionStorage.getItem('studioflow_user') || 'null');
+}
+catch { /* Invalid stored session is discarded below. */ }
+if (!state.user)
+    state.token = null;
+const admin = () => ['Admin', 'Manager'].includes(state.user?.role || '');
+const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const money = value => new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 }).format(value);
+const dateText = (value) => new Date(value).toLocaleString('ru-RU', { dateStyle: 'medium', timeStyle: 'short' });
+function notice(text, error = false) { $('notice').hidden = false; $('notice').textContent = text; $('notice').classList.toggle('error', error); }
+function logout() { state.token = null; state.user = null; sessionStorage.removeItem('studioflow_token'); sessionStorage.removeItem('studioflow_user'); $('editor').close(); $('confirm').close(); renderSession(); }
+function renderSession() { const signed = Boolean(state.token && state.user); $('auth').hidden = signed; $('workspace').hidden = !signed; $('logout').hidden = !signed; $('identity').textContent = signed ? state.user.email + ' · ' + ({ Admin: 'Администратор', Manager: 'Менеджер', Client: 'Клиент' }[state.user.role] || '') : ''; $('adminTab').hidden = !admin(); $('availability').hidden = true; }
+async function api(path, method = 'GET', body) {
+    const response = await fetch('/api' + path, { method, headers: { 'Content-Type': 'application/json', ...(state.token ? { Authorization: 'Bearer ' + state.token } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) });
+    const text = await response.text();
+    let data;
+    try {
+        data = JSON.parse(text);
+    }
+    catch {
+        data = text;
+    }
+    if (!response.ok) {
+        if (response.status === 401) {
+            if (!path.startsWith('/auth/')) {
+                logout();
+                $('authError').textContent = 'Сессия истекла. Войдите снова.';
+            }
+            throw new Error('Неверный email или пароль, либо сессия истекла.');
+        }
+        if (response.status === 403)
+            throw new Error('Недостаточно прав для этого действия.');
+        throw new Error(data?.errors ? Object.values(data.errors).flat().join(' ') : typeof data === 'string' && data ? data : data?.detail || data?.title || 'Не удалось выполнить запрос.');
+    }
+    return data;
+}
+async function busy(button, action) { button.disabled = true; try {
+    await action();
+}
+finally {
+    button.disabled = false;
+} }
+function switchAuth(register) { state.register = register; $('authTitle').textContent = register ? 'Создать аккаунт' : 'С возвращением'; $('authHint').textContent = register ? 'Начните бронировать студию онлайн' : 'Войдите, чтобы забронировать студию'; $('confirmation').hidden = !register; $('confirmPassword').required = register; $('password').minLength = register ? 8 : 1; $('password').autocomplete = register ? 'new-password' : 'current-password'; $('authSubmit').textContent = register ? 'Зарегистрироваться' : 'Войти'; $('switchAuth').textContent = register ? 'Уже есть аккаунт? Войти' : 'Нет аккаунта? Зарегистрироваться'; $('authError').textContent = ''; }
+$('switchAuth').onclick = () => switchAuth(!state.register);
+$('logout').onclick = logout;
+$('authForm').onsubmit = async (event) => { event.preventDefault(); $('authError').textContent = ''; if (state.register && $('password').value !== $('confirmPassword').value) {
+    $('authError').textContent = 'Пароли не совпадают.';
+    return;
+} await busy($('authSubmit'), async () => { try {
+    const body = { email: $('email').value.trim(), password: $('password').value };
+    if (state.register)
+        body.tenantId = (await api('/studio')).id;
+    const data = await api(state.register ? '/auth/register' : '/auth/login', 'POST', body);
+    state.token = data.token;
+    state.user = data;
+    sessionStorage.setItem('studioflow_token', data.token);
+    sessionStorage.setItem('studioflow_user', JSON.stringify({ id: data.id, email: data.email, role: data.role, tenantId: data.tenantId }));
+    $('authForm').reset();
+    renderSession();
+    tab('rooms');
+    await reload();
+}
+catch (e) {
+    $('authError').textContent = e.message;
+} }); };
+function tab(name) { for (const key of ['rooms', 'bookings', 'admin'])
+    document.getElementById(key + 'View').hidden = key !== name; document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === name)); }
+document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => tab(b.dataset.tab));
+async function reload() { try {
+    const [rooms, tariffs, bookings] = await Promise.all([api('/rooms'), api('/tariffs'), api('/bookings')]);
+    if (!state.token)
+        return;
+    Object.assign(state, { rooms, tariffs, bookings });
+    renderRooms();
+    renderBookings();
+    renderAdmin();
+}
+catch (e) {
+    notice(e.message, true);
+} }
+function renderRooms() { $('rooms').innerHTML = state.rooms.length ? state.rooms.map(r => '<article class="card"><p class="eyebrow">СТУДИЙНОЕ ПРОСТРАНСТВО</p><h3>' + escapeHtml(r.name) + '</h3><p>До ' + r.capacity + ' человек</p><div class="price">' + (r.tariff ? money(r.tariff.hourlyRate) + ' / час' : 'Тариф уточняется') + '</div><button class="primary" data-room="' + r.id + '">Посмотреть свободное время →</button></article>').join('') : '<p class="empty">Пока нет доступных комнат.</p>'; $('rooms').querySelectorAll('[data-room]').forEach(b => b.onclick = async () => { state.room = state.rooms.find(r => r.id === b.dataset.room) || null; if (!state.room)
+    return; $('availability').hidden = false; $('slotTitle').textContent = state.room.name; $('date').value ||= new Date().toISOString().slice(0, 10); await loadSlots(); $('availability').scrollIntoView({ behavior: 'smooth' }); }); }
+let slotVersion = 0;
+async function loadSlots() { const version = ++slotVersion; const room = state.room; if (!room || !$('date').value)
+    return; $('slots').textContent = 'Загрузка слотов…'; try {
+    const slots = await api('/rooms/' + room.id + '/slots?date=' + $('date').value);
+    if (version !== slotVersion || !state.token)
+        return;
+    $('slots').replaceChildren();
+    for (const slot of slots) {
+        const b = document.createElement('button');
+        b.disabled = !slot.available;
+        b.textContent = slot.startsAt.slice(11, 16) + '–' + slot.endsAt.slice(11, 16) + (slot.available ? '' : ' · занято');
+        b.onclick = () => confirmAction('Подтвердить бронирование?', room.name + ' · ' + slot.startsAt.slice(0, 10) + ' · ' + slot.startsAt.slice(11, 16) + ' UTC' + (room.tariff ? ' · ' + money(room.tariff.hourlyRate) : ''), async () => { try {
+            await api('/bookings', 'POST', { roomId: room.id, startsAt: slot.startsAt, endsAt: slot.endsAt });
+            notice('Бронирование создано.');
+            await reload();
+        }
+        finally {
+            await loadSlots();
+        } });
+        $('slots').append(b);
+    }
+}
+catch (e) {
+    if (version === slotVersion)
+        $('slots').textContent = e.message;
+} }
+$('date').min = new Date().toISOString().slice(0, 10);
+$('date').onchange = loadSlots;
+function renderBookings() { const filter = $('bookingFilter').value; const items = state.bookings.filter(b => (admin() || b.userId === state.user.id) && (filter === 'all' || b.status === filter)); $('bookings').innerHTML = items.length ? items.map(b => '<article class="row"><div><strong>' + escapeHtml(b.room?.name || 'Комната') + '</strong><p>' + dateText(b.startsAt) + ' — ' + dateText(b.endsAt) + '</p><span class="badge">' + (b.status === 'Active' ? 'Активно' : 'Отменено') + '</span></div>' + (b.status === 'Active' ? '<button data-cancel="' + b.id + '">Отменить бронирование</button>' : '') + '</article>').join('') : '<p class="empty">Бронирований в этой категории пока нет.</p>'; $('bookings').querySelectorAll('[data-cancel]').forEach(b => b.onclick = () => confirmAction('Отменить бронирование?', 'Комната снова станет доступна для других пользователей.', async () => { await api('/bookings/' + b.dataset.cancel + '/cancel', 'POST'); notice('Бронирование отменено.'); await reload(); if (state.room)
+    await loadSlots(); })); }
+$('bookingFilter').onchange = renderBookings;
+$('refresh').onclick = () => busy($('refresh'), reload);
+function renderAdmin() { if (!admin())
+    return; for (const [id, items, type] of [['adminRooms', state.rooms, 'room'], ['tariffs', state.tariffs, 'tariff']]) {
+    $(id).innerHTML = items.map(item => '<div class="row"><div><strong>' + escapeHtml(item.name) + '</strong><p>' + (type === 'room' ? item.capacity + ' чел. · ' + escapeHtml(item.tariff?.name || 'Без тарифа') : money(item.hourlyRate) + ' / час') + '</p></div><button data-edit="' + item.id + '">Изменить</button></div>').join('') || '<p class="empty">Список пока пуст.</p>';
+    $(id).querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openEditor(type, items.find(x => x.id === b.dataset.edit)));
+} }
+function openEditor(type, item) { state.editor = type; $('editorForm').reset(); $('editorError').textContent = ''; $('editId').value = item?.id || ''; $('editName').value = item?.name || ''; $('editorTitle').textContent = (item ? 'Изменить ' : 'Добавить ') + (type === 'room' ? 'комнату' : 'тариф'); $('roomFields').hidden = type !== 'room'; $('tariffFields').hidden = type !== 'tariff'; $('capacity').required = type === 'room'; $('rate').required = type === 'tariff'; $('capacity').value = String(item?.capacity || 6); $('rate').value = String(item?.hourlyRate ?? ''); $('isActive').checked = item?.isActive ?? true; $('tariff').innerHTML = '<option value="">Без тарифа</option>' + state.tariffs.map(t => '<option value="' + t.id + '">' + escapeHtml(t.name) + ' — ' + money(t.hourlyRate) + '</option>').join(''); $('tariff').value = item?.tariffId || ''; $('editor').showModal(); }
+$('newRoom').onclick = () => openEditor('room');
+$('newTariff').onclick = () => openEditor('tariff');
+$('closeEditor').onclick = () => $('editor').close();
+$('editorForm').onsubmit = async (event) => { event.preventDefault(); const button = event.submitter; await busy(button, async () => { try {
+    const id = $('editId').value;
+    const name = $('editName').value.trim();
+    if (!name)
+        throw new Error('Введите название.');
+    if (state.editor === 'tariff')
+        await api('/tariffs' + (id ? '/' + id : ''), id ? 'PUT' : 'POST', { name, hourlyRate: Number($('rate').value) });
+    else {
+        const body = { name, capacity: Number($('capacity').value), tariffId: $('tariff').value || null, isActive: $('isActive').checked };
+        if (id)
+            await api('/rooms/' + id, 'PUT', body);
+        else {
+            const created = await api('/rooms', 'POST', { name, capacity: body.capacity });
+            if (body.tariffId || !body.isActive)
+                await api('/rooms/' + created.id, 'PUT', body);
+        }
+    }
+    $('editor').close();
+    notice('Изменения сохранены.');
+    await reload();
+}
+catch (e) {
+    $('editorError').textContent = e.message;
+} }); };
+function confirmAction(title, text, action) { $('confirmTitle').textContent = title; $('confirmText').textContent = text; $('confirmYes').onclick = () => busy($('confirmYes'), async () => { try {
+    await action();
+}
+catch (e) {
+    notice(e.message, true);
+}
+finally {
+    $('confirm').close();
+} }); $('confirm').showModal(); }
+$('confirmNo').onclick = () => $('confirm').close();
+switchAuth(false);
+renderSession();
+if (state.token)
+    reload();
