@@ -1,9 +1,43 @@
-bin/
+# .NET build output and test artifacts
+**/bin/
+**/obj/
+packages/
+artifacts/
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+*.trx
+
+# Node.js
 node_modules/
-obj/
-/packages/
-riderModule.iml
-/_ReSharper.Caches/
+*.tsbuildinfo
+npm-debug.log*
+
+# IDE and operating system files
 .idea/
+.vs/
+_ReSharper.Caches/
+*.suo
 *.user
-appsettings.*.json
+*.sln.docstates
+*.iml
+.DS_Store
+Thumbs.db
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+appsettings.Local.json
+appsettings.*.Local.json
+*.pfx
+*.p12
+
+# Runtime files
+logs/
+*.log
+*.tmp
+
+# Generated JavaScript is currently committed for running without Node.js.
+# Do not ignore wwwroot/js until the .NET build compiles TypeScript automatically.

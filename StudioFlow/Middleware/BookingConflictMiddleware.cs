@@ -10,9 +10,9 @@ using Serilog;
 
 public static class BookingConflictMiddleware
 {
- public static void UseBookingConflicts(this WebApplication app)
- {
-app.Use(async (context, next) => { try { await next(context); } catch (DbUpdateException e) when (e.InnerException is Npgsql.PostgresException { SqlState: "23P01" }) { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync("Это время уже занято."); } });
+    public static void UseBookingConflicts(this WebApplication app)
+    {
+        app.Use(async (context, next) => { try { await next(context); } catch (DbUpdateException e) when (e.InnerException is Npgsql.PostgresException { SqlState: "23P01" }) { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync("Это время уже занято."); } });
 
- }
+    }
 }

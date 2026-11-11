@@ -1,0 +1,35 @@
+name: Build and validate
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: StudioFlow/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: StudioFlow
+        run: npm ci
+      - name: Check frontend formatting
+        working-directory: StudioFlow
+        run: npm run format:check
+      - name: Build TypeScript
+        working-directory: StudioFlow
+        run: npm run build
+      - name: Restore .NET dependencies
+        run: dotnet restore
+      - name: Build API
+        run: dotnet build --configuration Release --no-restore

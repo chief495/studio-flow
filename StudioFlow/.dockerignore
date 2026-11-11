@@ -2,3 +2,11 @@ bin/
 obj/
 node_modules/
 .git/
+.env
+.env.*
+!.env.example
+logs/
+TestResults/
+coverage/
+*.user
+.idea/

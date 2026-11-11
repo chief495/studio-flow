@@ -1,0 +1,54 @@
+export interface Elements {
+  notice: HTMLElement;
+  editor: HTMLDialogElement;
+  confirm: HTMLDialogElement;
+  auth: HTMLElement;
+  workspace: HTMLElement;
+  logout: HTMLButtonElement;
+  identity: HTMLElement;
+  adminTab: HTMLElement;
+  availability: HTMLElement;
+  authError: HTMLElement;
+  authTitle: HTMLElement;
+  authHint: HTMLElement;
+  confirmation: HTMLElement;
+  confirmPassword: HTMLInputElement;
+  password: HTMLInputElement;
+  authSubmit: HTMLButtonElement;
+  switchAuth: HTMLButtonElement;
+  authForm: HTMLFormElement;
+  email: HTMLInputElement;
+  rooms: HTMLElement;
+  slotTitle: HTMLElement;
+  date: HTMLInputElement;
+  slots: HTMLElement;
+  bookingFilter: HTMLSelectElement;
+  bookings: HTMLElement;
+  refresh: HTMLButtonElement;
+  editorForm: HTMLFormElement;
+  editorError: HTMLElement;
+  editId: HTMLInputElement;
+  editName: HTMLInputElement;
+  editorTitle: HTMLElement;
+  roomFields: HTMLElement;
+  tariffFields: HTMLElement;
+  capacity: HTMLInputElement;
+  rate: HTMLInputElement;
+  isActive: HTMLInputElement;
+  tariff: HTMLSelectElement;
+  newRoom: HTMLButtonElement;
+  newTariff: HTMLButtonElement;
+  closeEditor: HTMLButtonElement;
+  confirmTitle: HTMLElement;
+  confirmText: HTMLElement;
+  confirmYes: HTMLButtonElement;
+  confirmNo: HTMLButtonElement;
+  tariffs: HTMLElement;
+  adminRooms: HTMLElement;
+  roomsView: HTMLElement;
+  bookingsView: HTMLElement;
+  adminView: HTMLElement;
+}
+
+export const $ = <K extends keyof Elements>(id: K): Elements[K] =>
+  document.getElementById(id) as Elements[K];
