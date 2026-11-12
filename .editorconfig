@@ -9,6 +9,17 @@ trim_trailing_whitespace = true
 indent_style = space
 indent_size = 4
 csharp_new_line_before_open_brace = all
+csharp_prefer_braces = true:warning
+csharp_preserve_single_line_statements = false
+csharp_preserve_single_line_blocks = false
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+csharp_new_line_before_members_in_object_initializers = true
+csharp_new_line_before_members_in_anonymous_types = true
+csharp_style_expression_bodied_methods = false:suggestion
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
 
 [*.{ts,html,css,json}]
 indent_style = space
