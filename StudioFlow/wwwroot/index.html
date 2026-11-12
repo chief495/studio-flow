@@ -37,13 +37,20 @@
             /><label for="password">Пароль</label
             ><input id="password" type="password" autocomplete="current-password" required />
             <div id="confirmation" hidden>
-              <label for="confirmPassword">Повторите пароль</label
-              ><input id="confirmPassword" type="password" autocomplete="new-password" />
+              <label for="confirmPassword">Повторите пароль</label>
+              <input
+                id="confirmPassword"
+                type="password"
+                autocomplete="new-password"
+                maxlength="128"
+              />
             </div>
             <button class="primary" id="authSubmit">Войти</button>
             <p id="authError" role="alert"></p>
           </form>
-          <button id="switchAuth" class="link">Нет аккаунта? Зарегистрироваться</button>
+          <button id="switchAuth" type="button" class="link">
+            Нет аккаунта? Зарегистрироваться
+          </button>
         </div>
       </section>
       <section id="workspace" hidden>

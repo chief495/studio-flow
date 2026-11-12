@@ -12,14 +12,18 @@ public class BookingValidator : AbstractValidator<BookingRequest>
             .Must(value => value.Kind == DateTimeKind.Utc)
             .WithMessage("Окончание должно передаваться в UTC.");
         RuleFor(x => x)
-            .Must(x => x.EndsAt > x.StartsAt &&
-                       (x.EndsAt - x.StartsAt).TotalMinutes >= 30 &&
-                       (x.EndsAt - x.StartsAt).TotalMinutes <= 480)
+            .Must(x =>
+                x.EndsAt > x.StartsAt
+                && (x.EndsAt - x.StartsAt).TotalMinutes >= 30
+                && (x.EndsAt - x.StartsAt).TotalMinutes <= 480
+            )
             .WithMessage("Длительность бронирования — от 30 минут до 8 часов.");
         RuleFor(x => x)
-            .Must(x => x.StartsAt.Date == x.EndsAt.Date &&
-                       x.StartsAt.TimeOfDay >= TimeSpan.FromHours(9) &&
-                       x.EndsAt.TimeOfDay <= TimeSpan.FromHours(22))
+            .Must(x =>
+                x.StartsAt.Date == x.EndsAt.Date
+                && x.StartsAt.TimeOfDay >= TimeSpan.FromHours(9)
+                && x.EndsAt.TimeOfDay <= TimeSpan.FromHours(22)
+            )
             .WithMessage("Бронирование должно быть в пределах 09:00–22:00 UTC одного дня.");
     }
 }

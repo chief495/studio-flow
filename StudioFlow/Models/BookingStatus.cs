@@ -7,5 +7,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 
-
-public enum BookingStatus { Active, Cancelled }
+public enum BookingStatus
+{
+    Active,
+    Cancelled,
+}

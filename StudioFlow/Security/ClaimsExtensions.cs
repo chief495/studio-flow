@@ -7,5 +7,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 
+public static class ClaimsExtensions
+{
+    public static Guid TenantId(this ClaimsPrincipal p) =>
+        Guid.Parse(p.FindFirstValue("tenant_id")!);
 
-public static class ClaimsExtensions { public static Guid TenantId(this ClaimsPrincipal p) => Guid.Parse(p.FindFirstValue("tenant_id")!); public static Guid UserId(this ClaimsPrincipal p) => Guid.Parse(p.FindFirstValue(ClaimTypes.NameIdentifier)!); }
+    public static Guid UserId(this ClaimsPrincipal p) =>
+        Guid.Parse(p.FindFirstValue(ClaimTypes.NameIdentifier)!);
+}

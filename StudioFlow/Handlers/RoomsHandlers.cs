@@ -1,153 +1,124 @@
-using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Text;
 using FluentValidation;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
-using Serilog;
 
 public static class RoomsHandlers
 {
     public static void Map(WebApplication app)
     {
-        app.MapGet(
-                "/api/rooms/{id:guid}/availability",
-                async (Guid id, DateTime date, ClaimsPrincipal user, StudioFlowDbContext db) =>
-                {
-                    var tenantId = user.TenantId();
-                    if (
-                        !await db.Rooms.AnyAsync(room =>
-                            room.Id == id && room.TenantId == tenantId && room.IsActive
-                        )
-                    )
-                    {
-                        return Results.NotFound();
-                    }
-
-                    var day = DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
-                    var nextDay = day.AddDays(1);
-                    var occupied = await db
-                        .Bookings.Where(booking =>
-                            booking.RoomId == id
-                            && booking.TenantId == tenantId
-                            && booking.Status == BookingStatus.Active
-                            && booking.StartsAt < nextDay
-                            && booking.EndsAt > day
-                        )
-                        .OrderBy(booking => booking.StartsAt)
-                        .Select(booking => new { booking.StartsAt, booking.EndsAt })
-                        .ToListAsync();
-
-                    return Results.Ok(occupied);
-                }
-            )
-            .RequireAuthorization();
-
-        app.MapGet(
-                "/api/rooms/{id:guid}/slots",
-                async (Guid id, DateTime date, ClaimsPrincipal p, StudioFlowDbContext db) =>
-                {
-                    if (
-                        !await db.Rooms.AnyAsync(x =>
-                            x.Id == id && x.TenantId == p.TenantId() && x.IsActive
-                        )
-                    )
-                        return Results.NotFound();
-                    var start = DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
-                    var occupied = await db
-                        .Bookings.Where(x =>
-                            x.RoomId == id
-                            && x.Status == BookingStatus.Active
-                            && x.EndsAt > start
-                            && x.StartsAt < start.AddDays(1)
-                        )
-                        .ToListAsync();
-                    return Results.Ok(
-                        Enumerable
-                            .Range(9, 13)
-                            .Select(h => new
-                            {
-                                startsAt = start.AddHours(h),
-                                endsAt = start.AddHours(h + 1),
-                                available = start.AddHours(h) > DateTime.UtcNow
-                                    && !occupied.Any(b =>
-                                        b.StartsAt < start.AddHours(h + 1)
-                                        && b.EndsAt > start.AddHours(h)
-                                    ),
-                            })
-                    );
-                }
-            )
-            .RequireAuthorization();
-
-        app.MapPut(
-                "/api/rooms/{id:guid}",
-                async (Guid id, RoomEdit r, ClaimsPrincipal p, StudioFlowDbContext db) =>
-                {
-                    var room = await db.Rooms.SingleOrDefaultAsync(x =>
-                        x.Id == id && x.TenantId == p.TenantId()
-                    );
-                    if (room is null)
-                        return Results.NotFound();
-                    if (
-                        string.IsNullOrWhiteSpace(r.Name)
-                        || r.Capacity < 1
-                        || (
-                            r.TariffId.HasValue
-                            && !await db.Tariffs.AnyAsync(t =>
-                                t.Id == r.TariffId && t.TenantId == p.TenantId()
-                            )
-                        )
-                    )
-                        return Results.BadRequest();
-                    room.Name = r.Name;
-                    room.Capacity = r.Capacity;
-                    room.IsActive = r.IsActive;
-                    room.TariffId = r.TariffId;
-                    await db.SaveChangesAsync();
-                    return Results.NoContent();
-                }
-            )
+        var rooms = app.MapGroup("/api/rooms").RequireAuthorization();
+        rooms.MapGet("", ListRooms);
+        rooms.MapGet("/{id:guid}/availability", GetAvailability);
+        rooms.MapGet("/{id:guid}/slots", GetSlots);
+        rooms
+            .MapPost("", CreateRoom)
             .RequireAuthorization(policy => policy.RequireRole("Admin", "Manager"));
+        rooms
+            .MapPut("/{id:guid}", UpdateRoom)
+            .RequireAuthorization(policy => policy.RequireRole("Admin", "Manager"));
+    }
 
-        app.MapGet(
-                "/api/rooms",
-                async (ClaimsPrincipal p, StudioFlowDbContext db) =>
-                    Results.Ok(
-                        await db
-                            .Rooms.Where(x => x.TenantId == p.TenantId() && x.IsActive)
-                            .Include(x => x.Tariff)
-                            .ToListAsync()
-                    )
-            )
-            .RequireAuthorization();
+    private static async Task<IResult> ListRooms(
+        ClaimsPrincipal user,
+        StudioFlowDbContext db,
+        CancellationToken cancellationToken
+    )
+    {
+        var tenantId = user.TenantId();
+        var rooms = await db
+            .Rooms.AsNoTracking()
+            .Where(room => room.TenantId == tenantId && room.IsActive)
+            .Include(room => room.Tariff)
+            .ToListAsync(cancellationToken);
+        return Results.Ok(rooms);
+    }
 
-        app.MapPost(
-                "/api/rooms",
-                async (
-                    RoomRequest r,
-                    ClaimsPrincipal p,
-                    StudioFlowDbContext db,
-                    IValidator<RoomRequest> v
-                ) =>
-                {
-                    if (!p.IsInRole(Role.Admin.ToString()) && !p.IsInRole(Role.Manager.ToString()))
-                        return Results.Forbid();
-                    var vr = await v.ValidateAsync(r);
-                    if (!vr.IsValid)
-                        return Results.ValidationProblem(vr.ToDictionary());
-                    var room = new Room
-                    {
-                        Name = r.Name,
-                        Capacity = r.Capacity,
-                        TenantId = p.TenantId(),
-                    };
-                    db.Rooms.Add(room);
-                    await db.SaveChangesAsync();
-                    return Results.Created($"/api/rooms/{room.Id}", room);
-                }
-            )
-            .RequireAuthorization();
+    private static async Task<IResult> GetAvailability(
+        Guid id,
+        DateTime date,
+        ClaimsPrincipal user,
+        BookingService service,
+        CancellationToken cancellationToken
+    )
+    {
+        var occupied = await service.GetAvailabilityAsync(
+            id,
+            date,
+            BookingsHandlers.Actor(user),
+            cancellationToken
+        );
+        return Results.Ok(occupied);
+    }
+
+    private static async Task<IResult> GetSlots(
+        Guid id,
+        DateTime date,
+        ClaimsPrincipal user,
+        BookingService service,
+        CancellationToken cancellationToken
+    )
+    {
+        var slots = await service.GetHourlySlotsAsync(
+            id,
+            date,
+            BookingsHandlers.Actor(user),
+            cancellationToken
+        );
+        return Results.Ok(slots);
+    }
+
+    private static async Task<IResult> CreateRoom(
+        RoomRequest request,
+        ClaimsPrincipal user,
+        StudioFlowDbContext db,
+        IValidator<RoomRequest> validator,
+        CancellationToken cancellationToken
+    )
+    {
+        await validator.ValidateAndThrowAsync(request, cancellationToken);
+        var room = new Room
+        {
+            Name = request.Name,
+            Capacity = request.Capacity,
+            TenantId = user.TenantId(),
+        };
+        db.Rooms.Add(room);
+        await db.SaveChangesAsync(cancellationToken);
+        return Results.Created($"/api/rooms/{room.Id}", room);
+    }
+
+    private static async Task<IResult> UpdateRoom(
+        Guid id,
+        RoomEdit request,
+        ClaimsPrincipal user,
+        StudioFlowDbContext db,
+        IValidator<RoomEdit> validator,
+        CancellationToken cancellationToken
+    )
+    {
+        var tenantId = user.TenantId();
+        var room =
+            await db.Rooms.SingleOrDefaultAsync(
+                item => item.Id == id && item.TenantId == tenantId,
+                cancellationToken
+            ) ?? throw new ResourceNotFoundException("Комната не найдена.");
+
+        await validator.ValidateAndThrowAsync(request, cancellationToken);
+        if (request.TariffId.HasValue)
+        {
+            var tariffExists = await db.Tariffs.AnyAsync(
+                tariff => tariff.Id == request.TariffId && tariff.TenantId == tenantId,
+                cancellationToken
+            );
+            if (!tariffExists)
+                throw new ResourceNotFoundException("Тариф не найден.");
+        }
+
+        room.Name = request.Name;
+        room.Capacity = request.Capacity;
+        room.IsActive = request.IsActive;
+        room.TariffId = request.TariffId;
+        await db.SaveChangesAsync(cancellationToken);
+        return Results.NoContent();
     }
 }

@@ -7,5 +7,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 
-
-public enum Role { Admin, Manager, Client }
+public enum Role
+{
+    Admin,
+    Manager,
+    Client,
+}

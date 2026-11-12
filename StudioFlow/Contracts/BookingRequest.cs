@@ -7,5 +7,4 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 
-
 public record BookingRequest(Guid RoomId, DateTime StartsAt, DateTime EndsAt);

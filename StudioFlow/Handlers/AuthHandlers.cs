@@ -1,20 +1,95 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
 using FluentValidation;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
-using Serilog;
-
+using Npgsql;
 
 public static class AuthHandlers
 {
     public static void Map(WebApplication app)
     {
-        app.MapPost("/api/auth/register", async (RegisterRequest r, StudioFlowDbContext db, IValidator<RegisterRequest> v) => { var vr = await v.ValidateAsync(r); if (!vr.IsValid) return Results.ValidationProblem(vr.ToDictionary()); var email = r.Email.ToLowerInvariant(); if (await db.Users.AnyAsync(x => x.Email == email)) return Results.Conflict("Email is already registered."); var u = new User { Email = email, PasswordHash = PasswordHasher.Hash(r.Password), TenantId = r.TenantId }; db.Users.Add(u); await db.SaveChangesAsync(); return Results.Ok(new { token = TokenService.TokenFor(u, app.Configuration.GetSection("Jwt")), u.Id, u.Email, role = u.Role.ToString(), u.TenantId }); }).WithTags("Auth");
+        app.MapPost("/api/auth/register", Register).WithTags("Auth");
 
-        app.MapPost("/api/auth/login", async (LoginRequest r, StudioFlowDbContext db) => { var u = await db.Users.SingleOrDefaultAsync(x => x.Email == r.Email.ToLowerInvariant()); if (u is null || !PasswordHasher.Verify(r.Password, u.PasswordHash)) return Results.Unauthorized(); return Results.Ok(new { token = TokenService.TokenFor(u, app.Configuration.GetSection("Jwt")), u.Id, u.Email, role = u.Role.ToString(), u.TenantId }); }).WithTags("Auth");
+        app.MapPost("/api/auth/login", Login).WithTags("Auth");
+    }
 
+    private static async Task<IResult> Register(
+        RegisterRequest request,
+        StudioFlowDbContext db,
+        IValidator<RegisterRequest> validator,
+        IConfiguration configuration
+    )
+    {
+        var normalized = request with { Email = request.Email?.Trim().ToLowerInvariant() ?? "" };
+        await validator.ValidateAndThrowAsync(normalized);
+
+        if (await db.Users.AnyAsync(user => user.Email == normalized.Email))
+        {
+            return Results.Problem(statusCode: 409, title: "Этот email уже зарегистрирован.");
+        }
+
+        var user = new User
+        {
+            Email = normalized.Email,
+            PasswordHash = PasswordHasher.Hash(normalized.Password),
+            Role = Role.Client,
+            TenantId = DemoStudio.Id,
+        };
+        db.Users.Add(user);
+        try
+        {
+            await db.SaveChangesAsync();
+        }
+        catch (DbUpdateException exception)
+            when (exception.InnerException
+                    is PostgresException
+                    {
+                        SqlState: PostgresErrorCodes.UniqueViolation,
+                        ConstraintName: "IX_Users_Email"
+                    }
+            )
+        {
+            return Results.Problem(statusCode: 409, title: "Этот email уже зарегистрирован.");
+        }
+
+        return Results.Json(
+            new
+            {
+                token = TokenService.TokenFor(user, configuration.GetSection("Jwt")),
+                user.Id,
+                user.Email,
+                role = user.Role.ToString(),
+                user.TenantId,
+            },
+            statusCode: StatusCodes.Status201Created
+        );
+    }
+
+    private static async Task<IResult> Login(
+        LoginRequest request,
+        StudioFlowDbContext db,
+        IConfiguration configuration
+    )
+    {
+        if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrEmpty(request.Password))
+        {
+            return Results.Unauthorized();
+        }
+
+        var email = request.Email.Trim().ToLowerInvariant();
+        var user = await db.Users.SingleOrDefaultAsync(item => item.Email == email);
+        if (user is null || !PasswordHasher.Verify(request.Password, user.PasswordHash))
+        {
+            return Results.Unauthorized();
+        }
+
+        return Results.Ok(
+            new
+            {
+                token = TokenService.TokenFor(user, configuration.GetSection("Jwt")),
+                user.Id,
+                user.Email,
+                role = user.Role.ToString(),
+                user.TenantId,
+            }
+        );
     }
 }

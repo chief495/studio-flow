@@ -19,8 +19,9 @@ services:
   api:
     build: ./StudioFlow
     environment:
-      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=studioflow;Username=studioflow;Password=studioflow"
+      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=${API_DATABASE:-studioflow};Username=studioflow;Password=studioflow"
       Seed__AdminPassword: "${SEED_ADMIN_PASSWORD:-}"
+      Seed__DemoClientPassword: "${SEED_DEMO_CLIENT_PASSWORD:-}"
     ports:
       - "${API_PORT:-8080}:8080"
     depends_on:

@@ -1,6 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StudioFlow", "StudioFlow\StudioFlow.csproj", "{C1328631-0EB8-4825-BE85-AFD0F7C63731}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StudioFlow.IntegrationTests", "StudioFlow.IntegrationTests\StudioFlow.IntegrationTests.csproj", "{55D0553A-4658-461E-A2A6-B720E5635C45}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -12,5 +15,9 @@ Global
 		{C1328631-0EB8-4825-BE85-AFD0F7C63731}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C1328631-0EB8-4825-BE85-AFD0F7C63731}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C1328631-0EB8-4825-BE85-AFD0F7C63731}.Release|Any CPU.Build.0 = Release|Any CPU
+		{55D0553A-4658-461E-A2A6-B720E5635C45}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{55D0553A-4658-461E-A2A6-B720E5635C45}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{55D0553A-4658-461E-A2A6-B720E5635C45}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{55D0553A-4658-461E-A2A6-B720E5635C45}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

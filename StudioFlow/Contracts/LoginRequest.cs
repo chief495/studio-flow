@@ -7,5 +7,4 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 
-
 public record LoginRequest(string Email, string Password);

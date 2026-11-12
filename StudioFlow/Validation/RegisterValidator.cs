@@ -7,5 +7,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 
-
-public class RegisterValidator : AbstractValidator<RegisterRequest> { public RegisterValidator() { RuleFor(x => x.Email).EmailAddress(); RuleFor(x => x.Password).MinimumLength(8); RuleFor(x => x.TenantId).NotEmpty(); } }
+public class RegisterValidator : AbstractValidator<RegisterRequest>
+{
+    public RegisterValidator()
+    {
+        RuleFor(x => x.Email).NotEmpty().MaximumLength(254).EmailAddress();
+        RuleFor(x => x.Password).NotEmpty().MinimumLength(8).MaximumLength(128);
+    }
+}

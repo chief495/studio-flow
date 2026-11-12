@@ -7,5 +7,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 
-
-public class RoomValidator : AbstractValidator<RoomRequest> { public RoomValidator() { RuleFor(x => x.Name).NotEmpty().MaximumLength(120); RuleFor(x => x.Capacity).InclusiveBetween(1, 100); } }
+public class RoomValidator : AbstractValidator<RoomRequest>
+{
+    public RoomValidator()
+    {
+        RuleFor(x => x.Name).NotEmpty().MaximumLength(120);
+        RuleFor(x => x.Capacity).InclusiveBetween(1, 100);
+    }
+}

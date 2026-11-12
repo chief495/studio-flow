@@ -40,7 +40,6 @@ export interface State {
   rooms: Room[];
   tariffs: Tariff[];
   bookings: Booking[];
-  register: boolean;
   room: Room | null;
   editor: 'room' | 'tariff' | null;
 }

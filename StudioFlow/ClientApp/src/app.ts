@@ -60,43 +60,41 @@ async function busy(button: HTMLButtonElement, action: () => Promise<void>) {
     button.disabled = false;
   }
 }
-function switchAuth(register) {
-  state.register = register;
-  $('authTitle').textContent = register ? 'Создать аккаунт' : 'С возвращением';
-  $('authHint').textContent = register
-    ? 'Начните бронировать студию онлайн'
+$('logout').onclick = logout;
+let registrationMode = false;
+$('switchAuth').onclick = () => {
+  registrationMode = !registrationMode;
+  $('authForm').reset();
+  $('authError').textContent = '';
+  $('authTitle').textContent = registrationMode ? 'Создать аккаунт' : 'С возвращением';
+  $('authHint').textContent = registrationMode
+    ? 'Зарегистрируйтесь для бронирования в демо-студии'
     : 'Войдите, чтобы забронировать студию';
-  $('confirmation').hidden = !register;
-  $('confirmPassword').required = register;
-  $('password').minLength = register ? 8 : 1;
-  $('password').autocomplete = register ? 'new-password' : 'current-password';
-  $('authSubmit').textContent = register ? 'Зарегистрироваться' : 'Войти';
-  $('switchAuth').textContent = register
+  $('confirmation').hidden = !registrationMode;
+  $('confirmPassword').required = registrationMode;
+  $('password').minLength = registrationMode ? 8 : 1;
+  $('password').maxLength = 128;
+  $('password').autocomplete = registrationMode ? 'new-password' : 'current-password';
+  $('authSubmit').textContent = registrationMode ? 'Зарегистрироваться' : 'Войти';
+  $('switchAuth').textContent = registrationMode
     ? 'Уже есть аккаунт? Войти'
     : 'Нет аккаунта? Зарегистрироваться';
-  $('authError').textContent = '';
-}
-$('switchAuth').onclick = () => switchAuth(!state.register);
-$('logout').onclick = logout;
+};
 $('authForm').onsubmit = async (event) => {
   event.preventDefault();
   $('authError').textContent = '';
-  if (state.register && $('password').value !== $('confirmPassword').value) {
+  if (registrationMode && $('password').value !== $('confirmPassword').value) {
     $('authError').textContent = 'Пароли не совпадают.';
     return;
   }
+  const endpoint = registrationMode ? '/auth/register' : '/auth/login';
   await busy($('authSubmit'), async () => {
     try {
-      const body: { email: string; password: string; tenantId?: string } = {
+      const body: { email: string; password: string } = {
         email: $('email').value.trim(),
         password: $('password').value,
       };
-      if (state.register) body.tenantId = (await api<{ id: string }>('/studio')).id;
-      const data = await api<AuthResponse>(
-        state.register ? '/auth/register' : '/auth/login',
-        'POST',
-        body,
-      );
+      const data = await api<AuthResponse>(endpoint, 'POST', body);
       state.token = data.token;
       state.user = data;
       sessionStorage.setItem('studioflow_token', data.token);
@@ -451,7 +449,6 @@ function confirmAction(title, text, action) {
   $('confirm').showModal();
 }
 $('confirmNo').onclick = () => $('confirm').close();
-switchAuth(false);
 renderSession();
 if (state.token) reload();
 

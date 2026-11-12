@@ -38,6 +38,9 @@ appsettings.*.Local.json
 logs/
 *.log
 *.tmp
+*.dump
+*.backup
+migration.sql
 
 # Generated JavaScript is currently committed for running without Node.js.
 # Do not ignore wwwroot/js until the .NET build compiles TypeScript automatically.

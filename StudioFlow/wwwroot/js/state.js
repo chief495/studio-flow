@@ -4,7 +4,6 @@ export const state = {
     rooms: [],
     tariffs: [],
     bookings: [],
-    register: false,
     room: null,
     editor: null,
 };

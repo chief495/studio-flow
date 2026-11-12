@@ -7,5 +7,4 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 
-
-public record RegisterRequest(string Email, string Password, Guid TenantId);
+public record RegisterRequest(string Email, string Password);

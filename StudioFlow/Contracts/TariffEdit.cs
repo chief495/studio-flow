@@ -7,5 +7,4 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 
-
 public record TariffEdit(string Name, decimal HourlyRate);

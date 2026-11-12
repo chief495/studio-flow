@@ -7,5 +7,14 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 
-
-public class Booking { public Guid Id { get; set; } = Guid.NewGuid(); public Guid RoomId { get; set; } public Room? Room { get; set; } public Guid UserId { get; set; } public Guid TenantId { get; set; } public DateTime StartsAt { get; set; } public DateTime EndsAt { get; set; } public BookingStatus Status { get; set; } }
+public class Booking
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid RoomId { get; set; }
+    public Room? Room { get; set; }
+    public Guid UserId { get; set; }
+    public Guid TenantId { get; set; }
+    public DateTime StartsAt { get; set; }
+    public DateTime EndsAt { get; set; }
+    public BookingStatus Status { get; set; }
+}

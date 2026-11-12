@@ -10,6 +10,22 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: postgres
+          POSTGRES_USER: studioflow_test
+          POSTGRES_PASSWORD: studioflow_test
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U studioflow_test -d postgres"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      TEST_POSTGRES_CONNECTION: Host=localhost;Port=55432;Database=postgres;Username=studioflow_test;Password=studioflow_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -31,5 +47,18 @@ jobs:
         run: npm run build
       - name: Restore .NET dependencies
         run: dotnet restore
+      - name: Restore .NET tools
+        run: dotnet tool restore
+      - name: Check C# formatting
+        run: dotnet csharpier --check StudioFlow StudioFlow.IntegrationTests
       - name: Build API
         run: dotnet build --configuration Release --no-restore
+      - name: PostgreSQL integration tests
+        run: dotnet test --configuration Release --no-build --logger "trx;LogFileName=integration.trx"
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results
+          path: '**/TestResults/*.trx'
+          if-no-files-found: ignore

@@ -11,12 +11,12 @@ export interface Elements {
   authError: HTMLElement;
   authTitle: HTMLElement;
   authHint: HTMLElement;
-  confirmation: HTMLElement;
-  confirmPassword: HTMLInputElement;
   password: HTMLInputElement;
   authSubmit: HTMLButtonElement;
-  switchAuth: HTMLButtonElement;
   authForm: HTMLFormElement;
+  confirmation: HTMLElement;
+  confirmPassword: HTMLInputElement;
+  switchAuth: HTMLButtonElement;
   email: HTMLInputElement;
   rooms: HTMLElement;
   slotTitle: HTMLElement;
