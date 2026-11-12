@@ -12,6 +12,30 @@ public static class RoomsHandlers
 {
     public static void Map(WebApplication app)
     {
+        app.MapGet("/api/rooms/{id:guid}/availability", async (
+            Guid id, DateTime date, ClaimsPrincipal user, StudioFlowDbContext db) =>
+        {
+            var tenantId = user.TenantId();
+            if (!await db.Rooms.AnyAsync(room => room.Id == id &&
+                    room.TenantId == tenantId && room.IsActive))
+            {
+                return Results.NotFound();
+            }
+
+            var day = DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
+            var nextDay = day.AddDays(1);
+            var occupied = await db.Bookings
+                .Where(booking => booking.RoomId == id &&
+                    booking.TenantId == tenantId &&
+                    booking.Status == BookingStatus.Active &&
+                    booking.StartsAt < nextDay && booking.EndsAt > day)
+                .OrderBy(booking => booking.StartsAt)
+                .Select(booking => new { booking.StartsAt, booking.EndsAt })
+                .ToListAsync();
+
+            return Results.Ok(occupied);
+        }).RequireAuthorization();
+
         app.MapGet("/api/rooms/{id:guid}/slots", async (Guid id, DateTime date, ClaimsPrincipal p, StudioFlowDbContext db) =>
         {
             if (!await db.Rooms.AnyAsync(x => x.Id == id && x.TenantId == p.TenantId() && x.IsActive)) return Results.NotFound();

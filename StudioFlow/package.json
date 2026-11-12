@@ -4,8 +4,8 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit",
-    "format": "prettier --write \"ClientApp/src/**/*.ts\" wwwroot/index.html wwwroot/css/site.css",
-    "format:check": "prettier --check \"ClientApp/src/**/*.ts\" wwwroot/index.html wwwroot/css/site.css"
+    "format": "prettier --write \"ClientApp/src/**/*.ts\" wwwroot/index.html \"wwwroot/css/*.css\"",
+    "format:check": "prettier --check \"ClientApp/src/**/*.ts\" wwwroot/index.html \"wwwroot/css/*.css\""
   },
   "devDependencies": {
     "prettier": "^3.6.2",

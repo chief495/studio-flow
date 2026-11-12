@@ -10,4 +10,8 @@ export const money = (value) =>
     maximumFractionDigits: 2,
   }).format(value);
 export const dateText = (value: string) =>
-  new Date(value).toLocaleString('ru-RU', { dateStyle: 'medium', timeStyle: 'short' });
+  new Date(value).toLocaleString('ru-RU', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    timeZone: 'UTC',
+  }) + ' UTC';

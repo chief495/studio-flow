@@ -1,0 +1,263 @@
+/* Date navigation shares the StudioFlow panel and button palette. */
+.date-control.date-control-strip {
+  --date-surface: #1b2323;
+  --date-border: var(--line);
+  --date-accent: var(--accent);
+  --date-muted: #aab8b1;
+  display: flex;
+  flex: 1 1 100%;
+  align-items: stretch;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+}
+
+#availability > .section-title {
+  flex-wrap: wrap;
+}
+
+.date-strip {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  gap: 8px;
+}
+
+.date-strip button {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 60px;
+  margin: 0;
+  padding: 10px 18px;
+  border: 1px solid var(--date-border);
+  border-radius: 10px;
+  background: #101817;
+  color: inherit;
+  transition:
+    background-color 150ms,
+    border-color 150ms;
+  text-transform: capitalize;
+}
+
+.date-strip button strong {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.date-strip button span {
+  font-size: 12px;
+  color: var(--date-muted);
+  line-height: 1.3;
+  text-transform: lowercase;
+}
+
+.date-strip button:hover {
+  background: #25302b;
+  border-color: #45534b;
+  filter: none;
+}
+.date-strip button.selected {
+  background: #283623;
+  border-color: var(--date-accent);
+  color: var(--date-accent);
+}
+.date-strip button.selected span {
+  color: inherit;
+}
+
+.calendar-anchor {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+}
+
+.date-picker-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  min-height: 60px;
+  margin: 0;
+  padding: 10px 20px;
+  border: 1px solid #45534b;
+  border-radius: 10px;
+  background: #25302b;
+  color: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.date-picker-button::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+}
+
+.date-picker-button[aria-expanded='true']::after {
+  transform: translateY(2px) rotate(225deg);
+}
+
+.date-picker-button:hover {
+  background: #304034;
+  filter: none;
+}
+
+.date-picker-button.selected,
+.date-picker-button[aria-expanded='true'] {
+  background: #283623;
+  border-color: var(--date-accent);
+  color: var(--date-accent);
+}
+
+.calendar-popup {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 30;
+  width: 312px;
+  max-width: calc(100vw - 40px);
+  margin-top: 8px;
+  padding: 16px;
+  border: 1px solid var(--date-border);
+  border-radius: 16px;
+  background: var(--date-surface);
+  color: #e9eef0;
+  font: inherit;
+  box-shadow: 0 16px 40px #0006;
+}
+
+.calendar-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--date-border);
+}
+
+.calendar-heading strong {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.calendar-heading button {
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--date-border);
+  border-radius: 8px;
+  background: #25302b;
+  font-size: 26px;
+  line-height: 1;
+}
+
+.calendar-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  text-align: center;
+}
+
+.calendar-days > * {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 34px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.calendar-days span:nth-child(6),
+.calendar-days span:nth-child(7) {
+  color: var(--date-accent);
+}
+
+.calendar-days button {
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+}
+
+.calendar-days button:hover {
+  background: #304034;
+  filter: none;
+}
+.calendar-days button.selected {
+  background: var(--date-accent);
+  color: #192315;
+  font-weight: 700;
+}
+.calendar-days button[aria-current='date']:not(.selected) {
+  box-shadow: inset 0 0 0 1px var(--date-accent);
+}
+
+.calendar-days button.outside-month,
+.calendar-days button:disabled {
+  color: #718078;
+}
+
+.calendar-days button:disabled {
+  background: transparent;
+  opacity: 1;
+}
+
+.calendar-popup :focus-visible {
+  outline-color: var(--date-accent);
+  outline-offset: 1px;
+}
+
+@media (max-width: 900px) {
+  .date-strip button {
+    padding-inline: 10px;
+  }
+
+  .date-strip button strong,
+  .date-picker-button {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 650px) {
+  .date-control.date-control-strip {
+    flex-wrap: wrap;
+  }
+
+  .date-strip {
+    flex: 1 1 100%;
+    overflow-x: auto;
+  }
+
+  .date-strip button {
+    flex: 1 0 100px;
+  }
+
+  .calendar-anchor,
+  .date-picker-button {
+    width: 100%;
+  }
+
+  .calendar-popup {
+    right: auto;
+    left: 0;
+  }
+}

@@ -3,10 +3,29 @@ import { $ } from './dom.js';
 import { state, admin } from './state.js';
 import { escapeHtml, money, dateText } from './format.js';
 import { api } from './api.js';
+import { initializeBookingTime, editBookingTime, populateBookingTime } from './booking-time.js';
+import { initializePasswordVisibility } from './password-visibility.js';
+
+initializePasswordVisibility();
+let noticeTimer: ReturnType<typeof setTimeout> | undefined;
+function clearNotice(): void {
+  clearTimeout(noticeTimer);
+  $('notice').hidden = true;
+  $('notice').textContent = '';
+  $('notice').classList.remove('error');
+}
+document.addEventListener('input', () => {
+  clearNotice();
+  $('authError').textContent = '';
+  $('editorError').textContent = '';
+});
 function notice(text, error = false) {
+  if (!state.token) return;
+  clearNotice();
   $('notice').hidden = false;
   $('notice').textContent = text;
   $('notice').classList.toggle('error', error);
+  noticeTimer = setTimeout(clearNotice, error ? 8000 : 5000);
 }
 function logout() {
   state.token = null;
@@ -18,6 +37,9 @@ function logout() {
   renderSession();
 }
 function renderSession() {
+  $('notice').hidden = true;
+  $('notice').textContent = '';
+  $('notice').classList.remove('error');
   const signed = Boolean(state.token && state.user);
   $('auth').hidden = signed;
   $('workspace').hidden = !signed;
@@ -97,6 +119,7 @@ $('authForm').onsubmit = async (event) => {
   });
 };
 function tab(name: string | undefined) {
+  clearNotice();
   for (const key of ['rooms', 'bookings', 'admin'])
     document.getElementById(key + 'View')!.hidden = key !== name;
   document
@@ -147,64 +170,45 @@ function renderRooms() {
           state.room = state.rooms.find((r) => r.id === b.dataset.room) || null;
           if (!state.room) return;
           $('availability').hidden = false;
+          editBookingTime(null);
           $('slotTitle').textContent = state.room.name;
           $('date').value ||= new Date().toISOString().slice(0, 10);
           await loadSlots();
+          renderRoomBookings();
           $('availability').scrollIntoView({ behavior: 'smooth' });
         }),
     );
 }
 let slotVersion = 0;
 async function loadSlots() {
+  $('date').dispatchEvent(new Event('calendar-sync'));
   const version = ++slotVersion;
   const room = state.room;
   if (!room || !$('date').value) return;
   $('slots').textContent = 'Загрузка слотов…';
   try {
-    const slots = await api<Slot[]>('/rooms/' + room.id + '/slots?date=' + $('date').value);
+    const slots = await api<Slot[]>('/rooms/' + room.id + '/availability?date=' + $('date').value);
     if (version !== slotVersion || !state.token) return;
-    $('slots').replaceChildren();
-    for (const slot of slots) {
-      const b = document.createElement('button');
-      b.disabled = !slot.available;
-      b.textContent =
-        slot.startsAt.slice(11, 16) +
-        '–' +
-        slot.endsAt.slice(11, 16) +
-        (slot.available ? '' : ' · занято');
-      b.onclick = () =>
-        confirmAction(
-          'Подтвердить бронирование?',
-          room.name +
-            ' · ' +
-            slot.startsAt.slice(0, 10) +
-            ' · ' +
-            slot.startsAt.slice(11, 16) +
-            ' UTC' +
-            (room.tariff ? ' · ' + money(room.tariff.hourlyRate) : ''),
-          async () => {
-            try {
-              await api('/bookings', 'POST', {
-                roomId: room.id,
-                startsAt: slot.startsAt,
-                endsAt: slot.endsAt,
-              });
-              notice('Бронирование создано.');
-              await reload();
-            } finally {
-              await loadSlots();
-            }
-          },
-        );
-      $('slots').append(b);
-    }
+    $('slots').textContent =
+      'Занятое время: ' +
+      (slots
+        .map((slot) => slot.startsAt.slice(11, 16) + '–' + slot.endsAt.slice(11, 16))
+        .join(', ') || 'нет бронирований');
   } catch (e) {
     if (version === slotVersion) $('slots').textContent = e.message;
   }
 }
 $('date').min = new Date().toISOString().slice(0, 10);
 $('date').onchange = loadSlots;
+initializeBookingTime(
+  async () => {
+    await reload();
+    await loadSlots();
+  },
+  (message) => notice(message, true),
+);
 function renderBookings() {
+  renderRoomBookings();
   const filter = $('bookingFilter').value;
   const items = state.bookings.filter(
     (b) => (admin() || b.userId === state.user!.id) && (filter === 'all' || b.status === filter),
@@ -213,22 +217,37 @@ function renderBookings() {
     ? items
         .map(
           (b) =>
-            '<article class="row"><div><strong>' +
+            '<article class="row booking-row"><div class="booking-details"><strong>' +
             escapeHtml(b.room?.name || 'Комната') +
             '</strong><p>' +
             dateText(b.startsAt) +
             ' — ' +
             dateText(b.endsAt) +
-            '</p><span class="badge">' +
+            '</p></div><span class="booking-status ' +
+            (b.status === 'Active' ? 'booking-status-active' : 'booking-status-cancelled') +
+            '">' +
             (b.status === 'Active' ? 'Активно' : 'Отменено') +
-            '</span></div>' +
+            '</span>' +
             (b.status === 'Active'
-              ? '<button data-cancel="' + b.id + '">Отменить бронирование</button>'
-              : '') +
+              ? '<div class="actions"><button data-booking-edit="' +
+                b.id +
+                '">Изменить</button><button data-cancel="' +
+                b.id +
+                '">Отменить бронирование</button></div>'
+              : '<div class="actions"></div>') +
             '</article>',
         )
         .join('')
     : '<p class="empty">Бронирований в этой категории пока нет.</p>';
+  $('bookings')
+    .querySelectorAll<HTMLButtonElement>('[data-booking-edit]')
+    .forEach((button) => {
+      button.onclick = async () => {
+        const booking = state.bookings.find((item) => item.id === button.dataset.bookingEdit);
+        if (!booking) return;
+        await openBookingEditor(booking);
+      };
+    });
   $('bookings')
     .querySelectorAll<HTMLButtonElement>('[data-cancel]')
     .forEach(
@@ -245,6 +264,72 @@ function renderBookings() {
             },
           )),
     );
+}
+async function openBookingEditor(booking: Booking): Promise<void> {
+  const room = state.rooms.find((item) => item.id === booking.room?.id);
+  if (!room) {
+    notice('Комната больше недоступна для бронирования.', true);
+    return;
+  }
+
+  state.room = room;
+  tab('rooms');
+  $('availability').hidden = false;
+  $('slotTitle').textContent = 'Изменить бронирование · ' + room.name;
+  populateBookingTime(booking);
+  await loadSlots();
+  $('availability').scrollIntoView({ behavior: 'smooth' });
+}
+function renderRoomBookings(): void {
+  let container = document.getElementById('roomBookings');
+  if (!container) {
+    container = document.createElement('section');
+    container.id = 'roomBookings';
+    $('availability').append(container);
+  }
+  container.replaceChildren();
+  if (!state.room || !state.user) return;
+  const items = state.bookings.filter(
+    (booking) =>
+      booking.room?.id === state.room!.id &&
+      booking.status === 'Active' &&
+      (admin() || booking.userId === state.user!.id),
+  );
+  if (!items.length) return;
+  const heading = document.createElement('h3');
+  heading.textContent = 'Бронирования этой комнаты';
+  container.append(heading);
+  for (const booking of items) {
+    const row = document.createElement('div');
+    row.className = 'row';
+    const description = document.createElement('span');
+    description.textContent = dateText(booking.startsAt) + ' — ' + dateText(booking.endsAt);
+    const actions = document.createElement('div');
+    actions.className = 'actions';
+    for (const [label, attribute] of [
+      ['Изменить', 'data-booking-edit'],
+      ['Отменить', 'data-cancel'],
+    ]) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = label;
+      button.onclick = async () => {
+        clearNotice();
+        if (attribute === 'data-booking-edit') {
+          await openBookingEditor(booking);
+          return;
+        }
+        $('bookingFilter').value = 'all';
+        renderBookings();
+        $('bookings')
+          .querySelector<HTMLButtonElement>('[' + attribute + '="' + booking.id + '"]')
+          ?.click();
+      };
+      actions.append(button);
+    }
+    row.append(description, actions);
+    container.append(row);
+  }
 }
 $('bookingFilter').onchange = renderBookings;
 $('refresh').onclick = () => busy($('refresh'), reload);
