@@ -54,8 +54,10 @@ public sealed class BookingService(StudioFlowDbContext db, IValidator<BookingReq
             StartsAt = request.StartsAt,
             EndsAt = request.EndsAt,
             Status = BookingStatus.Active,
+            AppliedHourlyRate = room.Tariff?.HourlyRate,
         };
 
+        booking.TotalCost = CalculateCost(booking);
         db.Bookings.Add(booking);
         await db.SaveChangesAsync(cancellationToken);
         return ToView(booking);
@@ -78,10 +80,16 @@ public sealed class BookingService(StudioFlowDbContext db, IValidator<BookingReq
         var room = await GetRoomAsync(request.RoomId, actor.TenantId, cancellationToken);
         await EnsureNoOverlapAsync(request, id, cancellationToken);
 
+        if (booking.RoomId != room.Id)
+        {
+            booking.AppliedHourlyRate = room.Tariff?.HourlyRate;
+        }
+
         booking.RoomId = room.Id;
         booking.Room = room;
         booking.StartsAt = request.StartsAt;
         booking.EndsAt = request.EndsAt;
+        booking.TotalCost = CalculateCost(booking);
         await db.SaveChangesAsync(cancellationToken);
         return ToView(booking);
     }
@@ -215,14 +223,17 @@ public sealed class BookingService(StudioFlowDbContext db, IValidator<BookingReq
         }
     }
 
-    private static BookingView ToView(Booking booking)
-    {
-        var hourlyRate = booking.Room?.Tariff?.HourlyRate;
-        var durationHours = (decimal)(booking.EndsAt - booking.StartsAt).TotalMinutes / 60m;
-        decimal? estimatedCost = hourlyRate.HasValue
-            ? decimal.Round(hourlyRate.Value * durationHours, 2, MidpointRounding.AwayFromZero)
+    private static decimal? CalculateCost(Booking booking) =>
+        booking.AppliedHourlyRate is { } rate
+            ? decimal.Round(
+                rate * (booking.EndsAt - booking.StartsAt).Ticks / TimeSpan.TicksPerHour,
+                2,
+                MidpointRounding.AwayFromZero
+            )
             : null;
 
+    private static BookingView ToView(Booking booking)
+    {
         return new BookingView(
             booking.Id,
             booking.RoomId,
@@ -232,7 +243,9 @@ public sealed class BookingService(StudioFlowDbContext db, IValidator<BookingReq
             booking.StartsAt,
             booking.EndsAt,
             booking.Status,
-            estimatedCost,
+            booking.AppliedHourlyRate,
+            booking.TotalCost,
+            booking.TotalCost,
             "RUB"
         );
     }

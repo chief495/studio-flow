@@ -1,4 +1,4 @@
-/// <summary>EstimatedCost is a quote at the current tariff, not a captured payment.</summary>
+/// <summary>Stored booking price in RUB; EstimatedCost is a compatibility alias for TotalCost.</summary>
 public sealed record BookingView(
     Guid Id,
     Guid RoomId,
@@ -8,6 +8,8 @@ public sealed record BookingView(
     DateTime StartsAt,
     DateTime EndsAt,
     BookingStatus Status,
+    decimal? AppliedHourlyRate,
+    decimal? TotalCost,
     decimal? EstimatedCost,
     string Currency
 );

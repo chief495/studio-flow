@@ -221,6 +221,8 @@ function renderBookings() {
             dateText(b.startsAt) +
             ' — ' +
             dateText(b.endsAt) +
+            '</p><p>' +
+            (b.totalCost == null ? 'Стоимость уточняется' : money(b.totalCost)) +
             '</p></div><span class="booking-status ' +
             (b.status === 'Active' ? 'booking-status-active' : 'booking-status-cancelled') +
             '">' +

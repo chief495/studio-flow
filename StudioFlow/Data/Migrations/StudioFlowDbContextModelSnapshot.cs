@@ -27,6 +27,9 @@ namespace StudioFlow.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<decimal?>("AppliedHourlyRate")
+                        .HasColumnType("numeric");
+
                     b.Property<DateTime>("EndsAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -41,6 +44,9 @@ namespace StudioFlow.Data.Migrations
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
+
+                    b.Property<decimal?>("TotalCost")
+                        .HasColumnType("numeric");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");

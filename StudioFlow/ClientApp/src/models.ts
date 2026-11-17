@@ -28,6 +28,9 @@ export interface Booking {
   startsAt: string;
   endsAt: string;
   status: 'Active' | 'Cancelled';
+  appliedHourlyRate: number | null;
+  totalCost: number | null;
+  currency: string;
 }
 export interface Slot {
   startsAt: string;

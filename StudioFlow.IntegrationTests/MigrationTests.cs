@@ -14,9 +14,10 @@ public sealed class MigrationTests(BookingApiFixture fixture) : IClassFixture<Bo
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<StudioFlowDbContext>();
         var applied = (await db.Database.GetAppliedMigrationsAsync()).ToArray();
-        Assert.Equal(2, applied.Length);
+        Assert.Equal(3, applied.Length);
         Assert.EndsWith("_InitialSchema", applied[0]);
         Assert.EndsWith("_PreventOverlappingBookings", applied[1]);
+        Assert.EndsWith("_CaptureBookingPrice", applied[2]);
         Assert.Empty(await db.Database.GetPendingMigrationsAsync());
 
         var before = await Snapshot.Read(db);
@@ -36,7 +37,7 @@ public sealed class MigrationTests(BookingApiFixture fixture) : IClassFixture<Bo
         Assert.Single(await db.Database.GetAppliedMigrationsAsync());
         await db.Database.MigrateAsync();
         Assert.Equal(before, JsonSerializer.Serialize(await Snapshot.Read(db)));
-        Assert.Equal(2, (await db.Database.GetAppliedMigrationsAsync()).Count());
+        Assert.Equal(3, (await db.Database.GetAppliedMigrationsAsync()).Count());
     }
 
     [Fact]
@@ -108,7 +109,7 @@ public sealed class MigrationTests(BookingApiFixture fixture) : IClassFixture<Bo
                 JsonSerializer.Serialize(original),
                 JsonSerializer.Serialize(await Snapshot.Read(legacy))
             );
-            Assert.Equal(2, (await target.Database.GetAppliedMigrationsAsync()).Count());
+            Assert.Equal(3, (await target.Database.GetAppliedMigrationsAsync()).Count());
             var booking = original.Bookings[0];
             target.Bookings.Add(CopyBooking(booking, booking.StartsAt, BookingStatus.Active));
             var error = await Assert.ThrowsAsync<DbUpdateException>(
@@ -120,6 +121,48 @@ public sealed class MigrationTests(BookingApiFixture fixture) : IClassFixture<Bo
         {
             await Execute(admin, $"DROP DATABASE {targetName} WITH (FORCE)");
             await Execute(admin, $"DROP DATABASE {legacyName} WITH (FORCE)");
+        }
+    }
+
+    [Fact]
+    public async Task Price_migration_captures_existing_prices_and_rounds_to_kopecks()
+    {
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<StudioFlowDbContext>();
+        var migrations = (await db.Database.GetAppliedMigrationsAsync()).ToArray();
+        await db.GetService<IMigrator>().MigrateAsync(migrations[1]);
+        var tariffId = Guid.NewGuid();
+        var roomId = Guid.NewGuid();
+        var bookingId = Guid.NewGuid();
+        try
+        {
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO "Tariffs" ("Id", "Name", "HourlyRate", "TenantId")
+                VALUES ({tariffId}, 'Migration price', 1000.01, {fixture.StudioA});
+                INSERT INTO "Rooms" ("Id", "Name", "Capacity", "IsActive", "TenantId", "TariffId")
+                VALUES ({roomId}, 'Migration price', 2, true, {fixture.StudioA}, {tariffId});
+                INSERT INTO "Bookings" ("Id", "RoomId", "UserId", "TenantId", "StartsAt", "EndsAt", "Status")
+                VALUES ({bookingId}, {roomId}, {Guid.NewGuid()}, {fixture.StudioA},
+                    {fixture.Start}, {fixture.Start.AddMinutes(30)}, 1);
+                """
+            );
+            await db.Database.MigrateAsync();
+            var captured = await db.Bookings.AsNoTracking().SingleAsync(b => b.Id == bookingId);
+            Assert.Equal(1000.01m, captured.AppliedHourlyRate);
+            Assert.Equal(500.01m, captured.TotalCost);
+            var unpriced = await db
+                .Bookings.AsNoTracking()
+                .SingleAsync(b => b.Id == fixture.BookingA);
+            Assert.Null(unpriced.AppliedHourlyRate);
+            Assert.Null(unpriced.TotalCost);
+        }
+        finally
+        {
+            await db.Database.MigrateAsync();
+            await db.Bookings.Where(b => b.Id == bookingId).ExecuteDeleteAsync();
+            await db.Rooms.Where(r => r.Id == roomId).ExecuteDeleteAsync();
+            await db.Tariffs.Where(t => t.Id == tariffId).ExecuteDeleteAsync();
         }
     }
 

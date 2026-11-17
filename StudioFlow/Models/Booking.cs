@@ -16,5 +16,7 @@ public class Booking
     public Guid TenantId { get; set; }
     public DateTime StartsAt { get; set; }
     public DateTime EndsAt { get; set; }
+    public decimal? AppliedHourlyRate { get; set; }
+    public decimal? TotalCost { get; set; }
     public BookingStatus Status { get; set; }
 }
