@@ -19,15 +19,19 @@ public static class RoomsHandlers
     }
 
     private static async Task<IResult> ListRooms(
+        bool? includeInactive,
         ClaimsPrincipal user,
         StudioFlowDbContext db,
         CancellationToken cancellationToken
     )
     {
+        if (includeInactive == true && !user.IsInRole("Admin") && !user.IsInRole("Manager"))
+            return Results.Forbid();
+
         var tenantId = user.TenantId();
         var rooms = await db
             .Rooms.AsNoTracking()
-            .Where(room => room.TenantId == tenantId && room.IsActive)
+            .Where(room => room.TenantId == tenantId && (includeInactive == true || room.IsActive))
             .Include(room => room.Tariff)
             .ToListAsync(cancellationToken);
         return Results.Ok(rooms);

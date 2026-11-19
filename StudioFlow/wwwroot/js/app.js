@@ -128,7 +128,7 @@ document
 async function reload() {
     try {
         const [rooms, tariffs, bookings] = await Promise.all([
-            api('/rooms'),
+            api(admin() ? '/rooms?includeInactive=true' : '/rooms'),
             api('/tariffs'),
             api('/bookings'),
         ]);
@@ -144,8 +144,9 @@ async function reload() {
     }
 }
 function renderRooms() {
-    $('rooms').innerHTML = state.rooms.length
-        ? state.rooms
+    const activeRooms = state.rooms.filter((room) => room.isActive);
+    $('rooms').innerHTML = activeRooms.length
+        ? activeRooms
             .map((r) => '<article class="card"><p class="eyebrow">СТУДИЙНОЕ ПРОСТРАНСТВО</p><h3>' +
             escapeHtml(r.name) +
             '</h3><p>До ' +
@@ -252,7 +253,7 @@ function renderBookings() {
 }
 async function openBookingEditor(booking) {
     const room = state.rooms.find((item) => item.id === booking.room?.id);
-    if (!room) {
+    if (!room || !room.isActive) {
         notice('Комната больше недоступна для бронирования.', true);
         return;
     }
@@ -316,11 +317,16 @@ function renderRoomBookings() {
 }
 $('bookingFilter').onchange = renderBookings;
 $('refresh').onclick = () => busy($('refresh'), reload);
+$('roomFilter').onchange = renderAdmin;
 function renderAdmin() {
     if (!admin())
         return;
     for (const [id, items, type] of [
-        ['adminRooms', state.rooms, 'room'],
+        [
+            'adminRooms',
+            state.rooms.filter((room) => $('roomFilter').value === 'all' || ($('roomFilter').value === 'active') === room.isActive),
+            'room',
+        ],
         ['tariffs', state.tariffs, 'tariff'],
     ]) {
         $(id).innerHTML =
@@ -329,12 +335,41 @@ function renderAdmin() {
                 escapeHtml(item.name) +
                 '</strong><p>' +
                 (type === 'room'
-                    ? item.capacity + ' чел. · ' + escapeHtml(item.tariff?.name || 'Без тарифа')
+                    ? item.capacity +
+                        ' чел. · ' +
+                        escapeHtml(item.tariff?.name || 'Без тарифа') +
+                        (item.isActive ? ' · Активна' : ' · Отключена')
                     : money(item.hourlyRate) + ' / час') +
                 '</p></div><button data-edit="' +
                 item.id +
-                '">Изменить</button></div>')
+                '">Изменить</button>' +
+                (type === 'room' && !item.isActive
+                    ? '<button data-enable-room="' + item.id + '">Включить</button>'
+                    : '') +
+                '</div>')
                 .join('') || '<p class="empty">Список пока пуст.</p>';
+        $(id)
+            .querySelectorAll('[data-enable-room]')
+            .forEach((button) => {
+            button.onclick = () => busy(button, async () => {
+                const room = state.rooms.find((room) => room.id === button.dataset.enableRoom);
+                if (!room)
+                    return;
+                try {
+                    await api('/rooms/' + room.id, 'PUT', {
+                        name: room.name,
+                        capacity: room.capacity,
+                        tariffId: room.tariffId,
+                        isActive: true,
+                    });
+                    await reload();
+                    notice('Комната снова доступна для бронирования.');
+                }
+                catch (e) {
+                    notice(e.message, true);
+                }
+            });
+        });
         $(id)
             .querySelectorAll('[data-edit]')
             .forEach((b) => (b.onclick = () => openEditor(type, items.find((x) => x.id === b.dataset.edit))));

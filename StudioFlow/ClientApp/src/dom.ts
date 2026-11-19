@@ -45,6 +45,7 @@ export interface Elements {
   confirmNo: HTMLButtonElement;
   tariffs: HTMLElement;
   adminRooms: HTMLElement;
+  roomFilter: HTMLSelectElement;
   roomsView: HTMLElement;
   bookingsView: HTMLElement;
   adminView: HTMLElement;
